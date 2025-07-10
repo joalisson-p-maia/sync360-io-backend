@@ -6,6 +6,7 @@ use App\Http\Requests\UserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
@@ -31,7 +32,7 @@ class UserController extends Controller
 
     public function getUserById(string $id):JsonResponse{
         $user = User::find($id);
-        if(count($user) === 0){
+        if(!$user){
             return response()->json([
                 "status"=> "error",
                 "message"=> "Usuário não encontrado",
@@ -83,7 +84,7 @@ class UserController extends Controller
         ]);
     }
 
-   public function updateUserById(string $id, UserRequest $request): JsonResponse
+   public function updateUserById(string $id, Request $request): JsonResponse
     {
         $updateUser = User::find($id);
 
@@ -95,30 +96,33 @@ class UserController extends Controller
             ], 404);
         }
 
-        $userRequestValidated = $request->validated();
+        $request->validate([
+            'full_name' => 'required|string|max:60',
+            'age' => 'required|integer|min:1',
+            'street' => 'required|string|max:255',
+            'neighborhood' => 'required|string|max:255',
+            'state' => 'required|string|size:2',
+            'biography' => 'required|string|max:2000',
+            'profile' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ]);
 
-        if (array_key_exists('full_name', $userRequestValidated)) {
-            $updateUser->full_name = $userRequestValidated['full_name'];
+        if ($request->full_name) {
+            $updateUser->full_name = $request->full_name;
         }
-
-        if (array_key_exists('age', $userRequestValidated)) {
-            $updateUser->age = $userRequestValidated['age'];
+        if ($request->age) {
+            $updateUser->age = $request->age;
         }
-
-        if (array_key_exists('street', $userRequestValidated)) {
-            $updateUser->street = $userRequestValidated['street'];
+        if ($request->street) {
+            $updateUser->street = $request->street;
         }
-
-        if (array_key_exists('neighborhood', $userRequestValidated)) {
-            $updateUser->neighborhood = $userRequestValidated['neighborhood'];
+        if ($request->neighborhood) {
+            $updateUser->neighborhood = $request->neighborhood;
         }
-
-        if (array_key_exists('state', $userRequestValidated)) {
-            $updateUser->state = $userRequestValidated['state'];
+        if ($request->state) {
+            $updateUser->state = $request->state;
         }
-
-        if (array_key_exists('biography', $userRequestValidated)) {
-            $updateUser->biography = $userRequestValidated['biography'];
+        if ($request->biography) {
+            $updateUser->biography = $request->biography;
         }
 
         if ($request->hasFile('profile')) {
@@ -131,33 +135,34 @@ class UserController extends Controller
             $updateUser->profile = $newImagePath;
         }
 
-        if($updateUser->save()){
+        if(!$updateUser->save()){
             return response()->json([
                 "status"=> "error",
-                "message" => "Falha ao tentar atualiza usuário",
-                "status_code" => 500,
-                "data" => null
+                "message" => "Falha ao tentar atualizar usuário",
+                "status_code" => 500
             ],500);
         }
 
         return response()->json([
             "status" => "success",
             "message" => "Usuário atualizado com sucesso!",
-            "status_code" => 200,
-            "data" => $updateUser
+            "status_code" => 200
         ], 200);
     }
 
 
     public function deleteUserById(string $id): JsonResponse{
         $user = User::find($id);
-        if(count($user) === 0){
+        if(!$user){
             return response()->json([
                 "status"=> "error",
                 "message"=> "Usuário não encontrado",
                 "status_code" => 404,
             ],404);
         }
+
+        $folderName = str_replace(' ', '-', $user->full_name);
+        Storage::disk('public')->deleteDirectory("profiles/{$folderName}");
 
         $deleteUser = $user->delete();
         if(!$deleteUser){
